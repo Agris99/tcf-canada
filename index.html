@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Simulateur Expert - TCF Canada Expression Écrite</title>
+  <style>
+    :root {
+      --primary: #1a73e8;
+      --primary-hover: #1557b0;
+      --success: #137333;
+      --danger: #d93025;
+      --warning: #b06000;
+      --bg: #f8f9fa;
+      --surface: #ffffff;
+      --text: #202124;
+      --border: #dadce0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding-bottom: 50px;
+    }
+
+    /* Barre d'état sticky mobile */
+    .header {
+      position: sticky;
+      top: 0;
+      background: var(--surface);
+      padding: 12px 16px;
+      border-bottom: 2px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+    }
+
+    .timer {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--primary);
+      letter-spacing: 0.5px;
+    }
+    .timer.urgent { color: var(--danger); animation: pulse 1s infinite; }
+    @keyframes pulse { 50% { opacity: 0.5; } }
+
+    .status-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: 14px;
+      background: #e6f4ea;
+      color: var(--success);
+    }
+    .status-badge.saving { background: #fef7e0; color: var(--warning); }
+
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    /* Cartes d'instructions */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .task-badge {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+    .task-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .task-prompt {
+      font-size: 14px;
+      color: #3c4043;
+      white-space: pre-line;
+      background: #f1f3f4;
+      padding: 12px;
+      border-radius: 8px;
+      border-left: 4px solid var(--primary);
+    }
+
+    /* Zone de rédaction */
+    textarea {
+      width: 100%;
+      height: 250px;
+      padding: 14px;
+      font-size: 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      outline: none;
+      font-family: inherit;
+      line-height: 1.5;
+      background: var(--surface);
+      -webkit-appearance: none;
+    }
+    textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+    textarea:disabled { background: #e8eaed; color: #5f6368; }
+
+    /* Compteur et alertes */
+    .counter-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+    .word-count { font-size: 17px; font-weight: 800; }
+    .word-count.ok { color: var(--success); }
+    .word-count.err { color: var(--danger); }
+
+    .btn {
+      width: 100%;
+      padding: 16px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: background 0.2s;
+    }
+    .btn:active { background: var(--primary-hover); }
+    .btn:disabled { background: #bdc1c6; cursor: not-allowed; }
+
+    .banner {
+      display: none;
+      padding: 14px;
+      border-radius: 8px;
+      margin-top: 16px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .banner.error { background: #fce8e6; color: var(--danger); display: block; }
+    .banner.success { background: #e6f4ea; color: var(--success); display: block; }
+
+    /* Bilan de fin d'examen */
+    .summary-card {
+      display: none;
+      background: var(--surface);
+      border: 2px solid var(--success);
+      border-radius: 10px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    .summary-card h2 { color: var(--success); font-size: 18px; margin-bottom: 12px; }
+    .summary-item { margin-bottom: 12px; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+  <!-- En-tête mobile avec chronomètre officiel -->
+  <div class="header">
+    <div>
+      <div style="font-size: 10px; text-transform: uppercase; color: #5f6368; font-weight: bold;">TCF Canada EE</div>
+      <div id="timerDisplay" class="timer">60:00</div>
+    </div>
+    <div id="saveBadge" class="status-badge">● Connecté</div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div id="taskBadge" class="task-badge">TÂCHE 1 SUR 3</div>
+      <div id="taskTitle" class="task-title">Description</div>
+      <div id="taskPrompt" class="task-prompt">Chargement...</div>
+    </div>
+
+    <textarea id="editor" placeholder="Commencez à rédiger votre texte ici..."></textarea>
+
+    <div class="counter-row">
+      <div>
+        <span id="wordCounter" class="word-count err">0</span>
+        <span id="wordRange" style="color: #5f6368;">(Attendu : 60 - 120 mots)</span>
+      </div>
+      <div id="wordStatus" style="font-size: 13px; font-weight: 600; color: var(--danger);">0 mot manquant</div>
+    </div>
+
+    <div id="statusBanner" class="banner"></div>
+
+    <button id="nextBtn" class="btn" disabled>Valider la Tâche 1 et continuer →</button>
+
+    <!-- Résumé final à la fin de l'épreuve -->
+    <div id="summaryCard" class="summary-card">
+      <h2>🎉 Épreuve terminée avec succès !</h2>
+      <p style="margin-bottom: 12px; font-size: 14px;">Vos productions ont été enregistrées localement et sont prêtes à être transmises ou évaluées :</p>
+      <div id="summaryContent"></div>
+      <button onclick="window.print()" class="btn" style="background: #34a853; margin-top: 10px;">Imprimer / Enregistrer en PDF</button>
+    </div>
+  </div>
+
+  <script>
+    // Configuration officielle TCF Canada
+    const CONFIG = {
+      task_1: {
+        badge: "TÂCHE 1 SUR 3",
+        title: "Message pour décrire, raconter ou expliquer",
+        min: 60, max: 120,
+        prompt: "Vous venez de vous installer dans une nouvelle ville au Canada. Écrivez un message à un ami pour lui décrire votre nouveau quartier, expliquer ce qui vous plaît particulièrement et l'inviter à venir vous rendre visite."
+      },
+      task_2: {
+        badge: "TÂCHE 2 SUR 3",
+        title: "Compte-rendu d'expérience ou d'événement",
+        min: 120, max: 150,
+        prompt: "Vous avez participé à un projet communautaire ou bénévole marquant dans votre région. Rédigez un article pour le bulletin local afin de raconter cette expérience, exprimer vos impressions et encourager d'autres citoyens à s'engager."
+      },
+      task_3: {
+        badge: "TÂCHE 3 SUR 3",
+        title: "Synthèse de deux documents et prise de position",
+        min: 120, max: 180,
+        prompt: "Document 1 : Le développement du télétravail isole les employés et détériore l'esprit d'équipe au sein de l'entreprise.\n\nDocument 2 : La flexibilité du travail à distance améliore l'équilibre de vie et accroît l'efficacité professionnelle.\n\nConsigne : Présentez la synthèse des deux documents en comparant leurs points de vue, puis exprimez votre opinion personnelle argumentée sur ce fait de société."
+      }
+    };
+
+    let currentTaskId = 'task_1';
+    let timeLeft = 60 * 60; // 60 minutes
+    let isLocked = false;
+    let savedTexts = { task_1: '', task_2: '', task_3: '' };
+
+    // Algorithme officiel de comptage TCF (mots séparés par des espaces, apostrophes conservées)
+    function countWordsTCF(text) {
+      if (!text || !text.trim()) return 0;
+      const normalized = text.normalize('NFC')
+        .replace(/[’']/g, "'")
+        .replace(/[\u00A0\u2000-\u200B\u202F\u205F]/g, ' ')
+        .replace(/[\r\n\t]+/g, ' ');
+      const tokens = normalized.trim().split(/\s+/).filter(t => !/^[.,!?;:«»""()\[\]{}\-–—/…]+$/.test(t));
+      return tokens.length;
+    }
+
+    const editor = document.getElementById('editor');
+    const wordCounter = document.getElementById('wordCounter');
+    const wordRange = document.getElementById('wordRange');
+    const wordStatus = document.getElementById('wordStatus');
+    const nextBtn = document.getElementById('nextBtn');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const saveBadge = document.getElementById('saveBadge');
+    const taskBadge = document.getElementById('taskBadge');
+    const taskTitle = document.getElementById('taskTitle');
+    const taskPrompt = document.getElementById('taskPrompt');
+    const statusBanner = document.getElementById('statusBanner');
+    const summaryCard = document.getElementById('summaryCard');
+    const summaryContent = document.getElementById('summaryContent');
+
+    function refreshTaskView() {
+      const cfg = CONFIG[currentTaskId];
+      taskBadge.textContent = cfg.badge;
+      taskTitle.textContent = cfg.title;
+      taskPrompt.textContent = cfg.prompt;
+      wordRange.textContent = `(Attendu : ${cfg.min} - ${cfg.max} mots)`;
+      editor.value = savedTexts[currentTaskId] || '';
+      checkWords();
+
+      if (currentTaskId === 'task_3') {
+        nextBtn.textContent = "Terminer l'examen blanc TCF";
+      } else {
+        nextBtn.textContent = `Valider et passer à la ${currentTaskId === 'task_1' ? 'Tâche 2' : 'Tâche 3'} →`;
+      }
+    }
+
+    function checkWords() {
+      const count = countWordsTCF(editor.value);
+      const cfg = CONFIG[currentTaskId];
+      savedTexts[currentTaskId] = editor.value;
+
+      wordCounter.textContent = count;
+      if (count >= cfg.min && count <= cfg.max) {
+        wordCounter.className = "word-count ok";
+        wordStatus.textContent = "Longueur idéale";
+        wordStatus.style.color = "var(--success)";
+        nextBtn.disabled = isLocked;
+      } else {
+        wordCounter.className = "word-count err";
+        wordStatus.style.color = "var(--danger)";
+        if (count < cfg.min) {
+          wordStatus.textContent = `${cfg.min - count} mot(s) manquant(s)`;
+        } else {
+          wordStatus.textContent = `${count - cfg.max} mot(s) en trop`;
+        }
+        nextBtn.disabled = isLocked || count === 0;
+      }
+    }
+
+    editor.addEventListener('input', () => {
+      saveBadge.textContent = "⟳ Enregistrement...";
+      saveBadge.className = "status-badge saving";
+      checkWords();
+      localStorage.setItem('tcf_canada_data', JSON.stringify({ savedTexts, currentTaskId, timeLeft }));
+      setTimeout(() => {
+        saveBadge.textContent = "● Enregistré";
+        saveBadge.className = "status-badge";
+      }, 400);
+    });
+
+    // Chronomètre 60 minutes
+    const timerInterval = setInterval(() => {
+      if (isLocked) {
+        clearInterval(timerInterval);
+        return;
+      }
+      timeLeft--;
+      const min = Math.floor(timeLeft / 60);
+      const sec = timeLeft % 60;
+      timerDisplay.textContent = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+
+      if (timeLeft <= 300) {
+        timerDisplay.classList.add('urgent');
+      }
+
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        lockExam("Temps écoulé (60 minutes). L'épreuve est automatiquement close.");
+      }
+    }, 1000);
+
+    function lockExam(message) {
+      isLocked = true;
+      editor.disabled = true;
+      nextBtn.disabled = true;
+      statusBanner.textContent = message;
+      statusBanner.className = "banner error";
+      showFinalSummary();
+    }
+
+    nextBtn.addEventListener('click', () => {
+      if (isLocked) return;
+
+      if (currentTaskId === 'task_1') {
+        currentTaskId = 'task_2';
+        refreshTaskView();
+      } else if (currentTaskId === 'task_2') {
+        currentTaskId = 'task_3';
+        refreshTaskView();
+      } else {
+        isLocked = true;
+        editor.disabled = true;
+        nextBtn.disabled = true;
+        statusBanner.textContent = "Félicitations ! Vos trois tâches ont été soumises dans les délais impartis.";
+        statusBanner.className = "banner success";
+        showFinalSummary();
+      }
+    });
+
+    function showFinalSummary() {
+      summaryCard.style.display = "block";
+      let html = '';
+      for (const key of ['task_1', 'task_2', 'task_3']) {
+        const text = savedTexts[key] || '(Aucun texte rédigé)';
+        const count = countWordsTCF(text);
+        html += `<div class="summary-item">
+          <strong>${CONFIG[key].badge} :</strong> ${count} mots<br>
+          <div style="background:#f1f3f4; padding:8px; border-radius:6px; margin-top:4px; font-size:13px; max-height:100px; overflow-y:auto;">${text.replace(/\n/g, '<br>')}</div>
+        </div>`;
+      }
+      summaryContent.innerHTML = html;
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+
+    // Récupération automatique si la page est réactualisée
+    const existing = localStorage.getItem('tcf_canada_data');
+    if (existing) {
+      try {
+        const parsed = JSON.parse(existing);
+        savedTexts = parsed.savedTexts || savedTexts;
+        currentTaskId = parsed.currentTaskId || 'task_1';
+        if (parsed.timeLeft && parsed.timeLeft > 0) timeLeft = parsed.timeLeft;
+      } catch (e) {}
+    }
+
+    refreshTaskView();
+  </script>
+</body>
+</html>
